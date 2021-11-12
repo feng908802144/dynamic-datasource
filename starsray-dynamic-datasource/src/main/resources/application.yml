@@ -1,0 +1,31 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /dynamic
+
+spring:
+  datasource:
+    dynamic:
+      strict: false
+      primary: master
+      datasource:
+        master:
+          driver-class-name: com.mysql.jdbc.Driver
+          url: jdbc:mysql://127.0.0.1:3306/db?useUnicode=true&characterEncoding=UTF-8&useSSL=false&serverTimezone=Asia/Shanghai
+          username: root
+          password: root
+      druid:
+        wall:
+          comment-allow: true
+          none-base-statement-allow: true
+          variant-check: false
+          multi-statement-allow: true
+
+
+mybatis-plus:
+  configuration:
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+dynamic-ds:
+  sql-file-list:
+    - db/migration/V1.1__sakila.sql

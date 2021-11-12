@@ -1,0 +1,1 @@
+mvn install:install-file -Dfile=C:\Users\starsray\desktop\target\dynamic-ds-spring-boot-starter-1.0-SNAPSHOT.jar -DgroupId=com.starsray -DartifactId=dynamic-ds-spring-boot-starter -Dversion=1.0-SNAPSHOT -Dpackaging=jar
