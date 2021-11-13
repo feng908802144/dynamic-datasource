@@ -19,7 +19,7 @@ public class DsController {
         return R.success(strings);
     }
 
-    @PostMapping("addDatasourceWithCurrent")
+    @GetMapping("addDatasourceWithCurrent")
     public R<Set<String>> addDatasourceWithCurrent(@RequestParam("name") String name,
                                                    @RequestParam("database") String database) {
         return R.success(ds.addDatasourceWithCurrent(name, database));
