@@ -17,18 +17,11 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.TransactionStatus;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.DefaultTransactionDefinition;
-import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
 import javax.sql.DataSource;
-import java.io.IOException;
 import java.io.Serializable;
 import java.util.*;
 
@@ -253,10 +246,17 @@ public interface Ds {
 
             DataSourceProperty dataSourceProperty = new DataSourceProperty();
             dataSourceProperty.setPoolName(name);
-            dataSourceProperty.setUrl(DatabaseUtils.replaceDatabase(dsProperty.getUrl(), database));
+            String curUrl = DatabaseUtils.replaceDatabase(dsProperty.getUrl(), database);
+            dsProperty.setUrl(curUrl);
+            dataSourceProperty.setUrl(curUrl);
             dataSourceProperty.setUsername(dsProperty.getUsername());
             dataSourceProperty.setPassword(dsProperty.getPassword());
             dataSourceProperty.setDriverClassName(DsDriverEnum.getDriverClassName(dsProperty.getType()));
+
+            DatasourceInstance db = DatasourceInstance.builder().jdbcTemplate(jdbcTemplate).build().of(dsProperty);
+            DataSource dataSource = druidDataSourceCreator.createDataSource(dataSourceProperty);
+            ds.addDataSource(name, dataSource);
+            DatabaseUtils.createDatabase(jdbcTemplate, database);
 
             transactionTemplate.execute(status -> {
                 try {
@@ -267,11 +267,6 @@ public interface Ds {
                 }
                 return dataSources.keySet();
             });
-
-            DatasourceInstance db = DatasourceInstance.builder().jdbcTemplate(jdbcTemplate).build().of(dsProperty);
-            DataSource dataSource = druidDataSourceCreator.createDataSource(dataSourceProperty);
-            ds.addDataSource(name, dataSource);
-            DatabaseUtils.createDatabase(jdbcTemplate, database);
             db.save();
             return dataSources.keySet();
         }
@@ -431,7 +426,7 @@ public interface Ds {
             DruidDataSource druidDataSource = null;
             DataSource source = currentDataSources.get(name);
             if (source == null) {
-                throw new RuntimeException("*** dynamic ds *** can't find current datasource name " + name);
+                throw new RuntimeException("*** dynamic ds *** can't find datasource name " + name);
             }
             if (source instanceof ItemDataSource) {
                 druidDataSource = (DruidDataSource) ((ItemDataSource) source).getRealDataSource();

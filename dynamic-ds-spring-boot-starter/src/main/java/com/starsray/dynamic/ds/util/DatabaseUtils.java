@@ -12,7 +12,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.sql.DriverManager;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -60,7 +59,7 @@ public class DatabaseUtils {
             throw new RuntimeException("*** dynamic ds *** database info can't empty");
         }
         jdbcTemplate.execute(String.format("CREATE DATABASE IF NOT EXISTS `%s` DEFAULT CHARACTER SET UTF8", database));
-        log.info("*** Dynamic Ds *** create dataBase = {}", database);
+        log.info("*** dynamic ds *** create database:{}", database);
     }
 
     /**
@@ -72,7 +71,7 @@ public class DatabaseUtils {
         JdbcTemplate jdbcTemplate = createJdbcTemplate(property);
         String database = getDatabase(property.getUrl());
         jdbcTemplate.execute(String.format("CREATE DATABASE IF NOT EXISTS `%s` DEFAULT CHARACTER SET UTF8", database));
-        log.info("*** Dynamic Ds *** create dataBase = {}", database);
+        log.info("*** dynamic ds *** create dataBase = {}", database);
 
     }
 
@@ -108,13 +107,15 @@ public class DatabaseUtils {
         assert sqlText != null;
         String[] sqlStrings = sqlText.split(";");
         int execute = 0;
-        int total = sqlStrings.length;
+        int total = sqlStrings.length - 1;
         for (String sql : sqlStrings) {
             if (validateSql(sql, opList)) {
                 jdbcTemplate.execute(sql);
                 execute++;
             } else {
-                log.info("*** dynamic ds *** not execute sql \n{}", sql);
+                if (StringUtils.isNotBlank(sql)){
+                    log.info("*** dynamic ds *** not execute sql \n{}", sql);
+                }
             }
         }
         log.info("*** dynamic ds *** execute sql file complete total:{},execute:{}", total, execute);
@@ -166,9 +167,5 @@ public class DatabaseUtils {
             throw new RuntimeException("can't match host from url");
         }
         return m.group();
-    }
-
-    public static void main(String[] args) {
-        System.out.println(replaceDatabase("jdbc:mysql://127.0.0.1:3306/slave","cur"));
     }
 }

@@ -25,8 +25,8 @@ public class DsController {
         return R.success(ds.addDatasourceWithCurrent(name, database));
     }
 
-    @PostMapping("update")
-    public R<Boolean> update(@RequestParam("name") String name) {
-        return R.success(ds.executeSql(name, null));
+    @DeleteMapping("remove")
+    public R<Boolean> remove(@RequestParam("name") String name) {
+        return R.success(ds.removeDatasource(name));
     }
 }
