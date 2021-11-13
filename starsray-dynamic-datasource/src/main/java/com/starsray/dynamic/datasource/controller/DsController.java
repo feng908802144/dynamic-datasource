@@ -2,12 +2,9 @@ package com.starsray.dynamic.datasource.controller;
 
 import com.starsray.dynamic.datasource.bean.R;
 import com.starsray.dynamic.ds.core.Ds;
-import com.starsray.dynamic.ds.core.DsParam;
-import com.starsray.dynamic.ds.core.DsProperty;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
-import java.io.IOException;
 import java.util.Set;
 
 @RestController
@@ -22,15 +19,10 @@ public class DsController {
         return R.success(strings);
     }
 
-    @PostMapping("add")
-    public R<Set<String>> add(@RequestBody DsParam dsp) {
-        Set<String> strings = null;
-        try {
-            strings = ds.addDsWithCreateDatabase(dsp);
-        } catch (IOException e) {
-            e.printStackTrace();
-        }
-        return R.success(strings);
+    @PostMapping("addDatasourceWithCurrent")
+    public R<Set<String>> addDatasourceWithCurrent(@RequestParam("name") String name,
+                                                   @RequestParam("database") String database) {
+        return R.success(ds.addDatasourceWithCurrent(name, database));
     }
 
     @PostMapping("update")
