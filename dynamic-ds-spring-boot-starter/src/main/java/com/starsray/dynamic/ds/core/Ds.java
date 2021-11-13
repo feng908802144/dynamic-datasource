@@ -249,6 +249,8 @@ public interface Ds {
                 return dataSources.keySet();
             }
             DsProperty dsProperty = getDsProperty(defaultDsConfig.getPrimary(), dataSources);
+            dsProperty.setName(name);
+
             DataSourceProperty dataSourceProperty = new DataSourceProperty();
             dataSourceProperty.setPoolName(name);
             dataSourceProperty.setUrl(DatabaseUtils.replaceDatabase(dsProperty.getUrl(), database));
