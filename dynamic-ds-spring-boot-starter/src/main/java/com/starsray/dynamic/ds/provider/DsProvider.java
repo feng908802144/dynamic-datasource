@@ -43,15 +43,15 @@ public class DsProvider {
                         property.setPassword(rs.getString("password"));
                         dataSourcePropertiesMap.put(name, property);
                     }
-                    if (dataSourcePropertiesMap.size() == 0) {
-                        statement.execute(insertSql());
-                        DataSourceProperty dataSourceProperty = new DataSourceProperty();
-                        dataSourceProperty.setDriverClassName(defaultDsConfig.getDriverClassName());
-                        dataSourceProperty.setUrl(defaultDsConfig.getUrl());
-                        dataSourceProperty.setUsername(defaultDsConfig.getUsername());
-                        dataSourceProperty.setPassword(defaultDsConfig.getPassword());
-                        dataSourcePropertiesMap.put(defaultDsConfig.getPrimary(), dataSourceProperty);
-                    }
+//                    if (dataSourcePropertiesMap.size() == 0) {
+//                        statement.execute(insertSql());
+//                        DataSourceProperty dataSourceProperty = new DataSourceProperty();
+//                        dataSourceProperty.setDriverClassName(defaultDsConfig.getDriverClassName());
+//                        dataSourceProperty.setUrl(defaultDsConfig.getUrl());
+//                        dataSourceProperty.setUsername(defaultDsConfig.getUsername());
+//                        dataSourceProperty.setPassword(defaultDsConfig.getPassword());
+//                        dataSourcePropertiesMap.put(defaultDsConfig.getPrimary(), dataSourceProperty);
+//                    }
                 } catch (SQLException e) {
                     e.printStackTrace();
                 } finally {
