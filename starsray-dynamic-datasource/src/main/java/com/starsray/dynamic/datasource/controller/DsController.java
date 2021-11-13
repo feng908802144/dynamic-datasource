@@ -29,4 +29,9 @@ public class DsController {
     public R<Boolean> remove(@RequestParam("name") String name) {
         return R.success(ds.removeDatasource(name));
     }
+
+    @GetMapping("execute")
+    public R<Boolean> execute(@RequestParam("name") String name){
+        return R.success(ds.executeSqlByName(name));
+    }
 }

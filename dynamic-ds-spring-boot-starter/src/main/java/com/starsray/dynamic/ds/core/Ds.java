@@ -313,6 +313,7 @@ public interface Ds {
                 } catch (Exception e) {
                     status.isRollbackOnly();
                     e.printStackTrace();
+                    return false;
                 }
                 return true;
             });
@@ -341,6 +342,7 @@ public interface Ds {
                 } catch (Exception e) {
                     status.isRollbackOnly();
                     e.printStackTrace();
+                    return false;
                 }
                 return true;
             });
@@ -376,6 +378,7 @@ public interface Ds {
                 } catch (Exception e) {
                     status.isRollbackOnly();
                     e.printStackTrace();
+                    return false;
                 }
                 return true;
             });
