@@ -5,11 +5,10 @@ import lombok.Data;
 import java.io.Serializable;
 
 @Data
-public class DsParam implements Serializable {
+public class Params implements Serializable {
     private String type;
     private String name;
     private String url;
-    private String database;
     private String username;
     private String password;
     private String sqlFileUrl;

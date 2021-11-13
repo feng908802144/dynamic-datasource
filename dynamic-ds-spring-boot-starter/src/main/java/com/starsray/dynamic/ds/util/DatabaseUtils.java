@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.sql.DriverManager;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -54,7 +55,10 @@ public class DatabaseUtils {
      * @param jdbcTemplate jdbc模板
      * @param database     数据库
      */
-    public synchronized static void createDatabse(JdbcTemplate jdbcTemplate, String database) {
+    public synchronized static void createDatabase(JdbcTemplate jdbcTemplate, String database) {
+        if (StringUtils.isBlank(database)) {
+            throw new RuntimeException("*** dynamic ds *** database info can't empty");
+        }
         jdbcTemplate.execute(String.format("CREATE DATABASE IF NOT EXISTS `%s` DEFAULT CHARACTER SET UTF8", database));
         log.info("*** Dynamic Ds *** create dataBase = {}", database);
     }
@@ -115,22 +119,29 @@ public class DatabaseUtils {
         assert sqlText != null;
         String[] sqlStrings = sqlText.split(";");
         int execute = 0;
-        int notExec = 0;
         int total = sqlStrings.length;
         for (String sql : sqlStrings) {
-            if (StringUtils.isNotBlank(sql)) {
-                for (String opType : opList) {
-                    if (sql.toLowerCase().contains(opType)) {
-                        jdbcTemplate.execute(sql);
-                        execute++;
-                    } else {
-                        log.info("*** dynamic ds *** can't execute this type {} of \nsql {}", opType, sql);
-                        notExec++;
-                    }
-                }
+            if (validateSql(sql, opList)) {
+                jdbcTemplate.execute(sql);
+                execute++;
+            } else {
+                log.info("*** dynamic ds *** not execute sql \n{}", sql);
             }
         }
-        log.info("*** dynamic ds *** execute sql file complete total:{},execute:{},not execute:{}", total, execute, notExec);
+        log.info("*** dynamic ds *** execute sql file complete total:{},execute:{}", total, execute);
+    }
+
+    public static boolean validateSql(String sql, List<String> opList) {
+        boolean bool = false;
+        for (String op : opList) {
+            if (sql.toLowerCase().contains(op)) {
+                bool = true;
+            }
+            if (bool) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private static String getDatabase(String url) {
@@ -160,15 +171,5 @@ public class DatabaseUtils {
             throw new RuntimeException("can't match host from url");
         }
         return m.group();
-    }
-
-    public static void validateDsProperty(DsProperty property) {
-        String url = property.getUrl();
-        String database = property.getDatabase();
-        if (StringUtils.isNotBlank(url) && StringUtils.isNotBlank(database)) {
-            if (!database.equals(getDatabase(url))) {
-                throw new RuntimeException("*** dynamic ds *** contains database info are not consistency");
-            }
-        }
     }
 }

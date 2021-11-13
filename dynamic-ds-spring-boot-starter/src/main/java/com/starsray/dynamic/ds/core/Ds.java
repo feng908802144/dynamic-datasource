@@ -5,6 +5,7 @@ import com.baomidou.dynamic.datasource.DynamicRoutingDataSource;
 import com.baomidou.dynamic.datasource.creator.DruidDataSourceCreator;
 import com.baomidou.dynamic.datasource.ds.ItemDataSource;
 import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.DataSourceProperty;
+import com.starsray.dynamic.ds.config.DefaultDsConfig;
 import com.starsray.dynamic.ds.config.DefaultDsSqlFileConfig;
 import com.starsray.dynamic.ds.constant.DsDriverEnum;
 import com.starsray.dynamic.ds.util.DatabaseUtils;
@@ -44,19 +45,40 @@ public interface Ds {
     /**
      * 添加数据源
      *
-     * @param param 停止
+     * @param name     名称
+     * @param database 数据库
      * @return {@link Set<String> }
      */
-    Set<String> addDatasource(DsParam param) throws IOException;
+    Set<String> addDatasourceWithCurrent(String name, String database);
+
+
+    /**
+     * 添加数据源
+     *
+     * @param name     数据源名称
+     * @param type     mysql类型 mysql5、mysql8
+     * @param url      jdbcUrl
+     * @param username 用户名
+     * @param password 密码
+     * @return {@link Set<String> }
+     */
+    Set<String> addDatasourceWithOnly(String name, String type, String url, String username, String password);
+
+    /**
+     * 额外添加数据源
+     *
+     * @param params params
+     * @return {@link Set<String> }
+     */
+    Set<String> addDatasourceWithParams(Params params);
 
     /**
      * 删除数据源
      *
      * @param name 名称
-     * @param drop 滴
      * @return boolean
      */
-    boolean removeDatasource(String name, boolean drop);
+    boolean removeDatasource(String name);
 
     /**
      * 执行sql文本 执行指定数据源、指定位置处sql
@@ -113,21 +135,20 @@ public interface Ds {
         /**
          * 添加数据源
          *
-         * @param param param
+         * @param params params
          * @return {@link Set<String> }
          */
         @Override
         @Transactional(rollbackFor = Exception.class)
-        public Set<String> addDatasource(DsParam param) {
+        public Set<String> addDatasourceWithParams(Params params) {
+            validateParams(params);
             DsProperty property = new DsProperty();
-            BeanUtils.copyProperties(param,property);
-            DatabaseUtils.validateDsProperty(property);
+            BeanUtils.copyProperties(params, property);
             DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
             DatasourceInstance db = DatasourceInstance.builder().jdbcTemplate(jdbcTemplate).build().of(property);
             if (ds.getDataSources().containsKey(db.getName())) {
                 return ds.getDataSources().keySet();
             }
-            // 如果正常连接在新数据源执行，如果连接不通畅 在当前数据源执行SQL
             List<String> opList = Arrays.asList("create", "alter");
             if (DatabaseUtils.validateConn(property)) {
                 DatabaseUtils.createDatabase(property);
@@ -137,10 +158,6 @@ public interface Ds {
                     property.setSqlFileUrl(sqlFileUrl);
                     DatabaseUtils.executeSql(property);
                 });
-            } else {
-                DatabaseUtils.createDatabse(jdbcTemplate, property.getDatabase());
-                List<String> sqlFileUrlList = defaultDsSqlFileConfig.getSqlFileList();
-                sqlFileUrlList.forEach(sqlFileUrl -> DatabaseUtils.executeSql(jdbcTemplate, sqlFileUrl, opList));
             }
             db.save();
             DataSourceProperty dataSourceProperty = new DataSourceProperty();
@@ -154,23 +171,111 @@ public interface Ds {
             return ds.getDataSources().keySet();
         }
 
+        private void validateParams(Params params) {
+            if (StringUtils.isBlank(params.getName())) {
+                throw new RuntimeException("*** dynamic ds *** method add datasource with params params name can't empty");
+            }
+            if (StringUtils.isBlank(params.getPassword())) {
+                throw new RuntimeException("*** dynamic ds *** method add datasource with params params password can't empty");
+            }
+            if (StringUtils.isBlank(params.getType())) {
+                throw new RuntimeException("*** dynamic ds *** method add datasource with params params type can't empty");
+            }
+            if (StringUtils.isBlank(params.getUrl())) {
+                throw new RuntimeException("*** dynamic ds *** method add datasource with params params url can't empty");
+            }
+            if (StringUtils.isBlank(params.getUsername())) {
+                throw new RuntimeException("*** dynamic ds *** method add datasource with params params username can't empty");
+            }
+            if (StringUtils.isBlank(params.getSqlFileUrl())) {
+                throw new RuntimeException("*** dynamic ds *** method add datasource with params params sql file url can't empty");
+            }
+        }
+
+        @Override
+        public Set<String> addDatasourceWithOnly(String name, String type, String url, String username, String password) {
+            if (StringUtils.isBlank(name)) {
+                throw new RuntimeException("*** dynamic ds *** method add datasource with only params name can't empty");
+            }
+            if (StringUtils.isBlank(password)) {
+                throw new RuntimeException("*** dynamic ds *** method add datasource with only params password can't empty");
+            }
+            if (StringUtils.isBlank(type)) {
+                throw new RuntimeException("*** dynamic ds *** method add datasource with only params type can't empty");
+            }
+            if (StringUtils.isBlank(url)) {
+                throw new RuntimeException("*** dynamic ds *** method add datasource with only params url can't empty");
+            }
+            if (StringUtils.isBlank(username)) {
+                throw new RuntimeException("*** dynamic ds *** method add datasource with only params username can't empty");
+            }
+            String driverClassName = DsDriverEnum.getDriverClassName(type);
+            DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
+            if (ds.getDataSources().containsKey(name)) {
+                return ds.getDataSources().keySet();
+            }
+            DataSourceProperty dataSourceProperty = new DataSourceProperty();
+            dataSourceProperty.setPoolName(name);
+            dataSourceProperty.setUrl(url);
+            dataSourceProperty.setUsername(username);
+            dataSourceProperty.setPassword(password);
+            dataSourceProperty.setDriverClassName(driverClassName);
+            DataSource dataSource = druidDataSourceCreator.createDataSource(dataSourceProperty);
+            ds.addDataSource(name, dataSource);
+
+            DsProperty property = new DsProperty();
+            DatasourceInstance db = DatasourceInstance.builder().jdbcTemplate(jdbcTemplate).build().of(property);
+            property.setType(type);
+            property.setUrl(url);
+            property.setUsername(username);
+            property.setPassword(password);
+            property.setName(name);
+            db.save();
+            return ds.getDataSources().keySet();
+        }
+
+
+        @Override
+        public Set<String> addDatasourceWithCurrent(String name, String database) {
+            if (StringUtils.isBlank(name)) {
+                throw new RuntimeException("*** dynamic ds *** method add datasource with current params name can't empty");
+            }
+            if (StringUtils.isBlank(database)) {
+                throw new RuntimeException("*** dynamic ds *** method add datasource with current params database can't empty");
+            }
+            DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
+            DsProperty dsProperty = getDsProperty(name, ds.getDataSources());
+            DataSourceProperty dataSourceProperty = new DataSourceProperty();
+            dataSourceProperty.setPoolName(name);
+            dataSourceProperty.setUrl(dsProperty.getUrl());
+            dataSourceProperty.setUsername(dsProperty.getUsername());
+            dataSourceProperty.setPassword(dsProperty.getPassword());
+            dataSourceProperty.setDriverClassName(DsDriverEnum.getDriverClassName(dsProperty.getType()));
+
+            DatasourceInstance db = DatasourceInstance.builder().jdbcTemplate(jdbcTemplate).build().of(dsProperty);
+            DataSource dataSource = druidDataSourceCreator.createDataSource(dataSourceProperty);
+            ds.addDataSource(name, dataSource);
+            DatabaseUtils.createDatabase(jdbcTemplate, database);
+            executeSqlByName(name);
+            db.save();
+            return ds.getDataSources().keySet();
+        }
 
         /**
          * 删除数据源
          *
          * @param name 名称
-         * @param drop 滴
          * @return boolean
          */
         @Override
         @Transactional(rollbackFor = Exception.class)
-        public boolean removeDatasource(String name, boolean drop) {
-            if (name.equals("master")) {
-                throw new RuntimeException("datasource master can't remove!");
+        public boolean removeDatasource(String name) {
+            if ("master".equals(name)) {
+                throw new RuntimeException("*** dynamic ds *** datasource master can't remove!");
             }
             DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
             if (!ds.getDataSources().containsKey(name)) {
-                throw new RuntimeException("datasource " + name + " not exist!");
+                throw new RuntimeException("*** dynamic ds *** datasource " + name + " not exist!");
             }
             DatasourceInstance datasourceInstance = DatasourceInstance.builder().jdbcTemplate(jdbcTemplate).name(name).build();
             datasourceInstance.remove();
@@ -297,10 +402,12 @@ public interface Ds {
             String url = druidDataSource.getUrl();
             String username = druidDataSource.getUsername();
             String password = druidDataSource.getPassword();
+            String driverClassName = druidDataSource.getDriverClassName();
             DsProperty dsProperty = new DsProperty();
             dsProperty.setUrl(url);
             dsProperty.setUsername(username);
             dsProperty.setPassword(password);
+            dsProperty.setType(DsDriverEnum.getType(driverClassName));
             return dsProperty;
         }
 
@@ -327,6 +434,8 @@ public interface Ds {
         private JdbcTemplate jdbcTemplate;
         @Resource
         private DefaultDsSqlFileConfig defaultDsSqlFileConfig;
+        @Resource
+        private DefaultDsConfig defaultDsConfig;
     }
 
     @Data

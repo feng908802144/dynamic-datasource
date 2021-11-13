@@ -26,7 +26,7 @@ public class DsController {
     public R<Set<String>> add(@RequestBody DsParam dsp) {
         Set<String> strings = null;
         try {
-            strings = ds.addDatasource(dsp);
+            strings = ds.addDsWithCreateDatabase(dsp);
         } catch (IOException e) {
             e.printStackTrace();
         }
