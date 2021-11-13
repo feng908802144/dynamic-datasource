@@ -79,7 +79,7 @@ public class DatabaseUtils {
      * @param sqlFileUrl   sql文件url
      * @param opList       操作列表
      */
-    public synchronized static void executeSql(JdbcTemplate jdbcTemplate, String sqlFileUrl,List<String> opList) {
+    public synchronized static void executeSql(JdbcTemplate jdbcTemplate, String sqlFileUrl, List<String> opList) {
         execute(sqlFileUrl, jdbcTemplate, opList);
     }
 
@@ -114,17 +114,20 @@ public class DatabaseUtils {
         }
         assert sqlText != null;
         String[] sqlStrings = sqlText.split(";");
+        int count = 0;
+        int total = sqlStrings.length;
         for (String sql : sqlStrings) {
             if (StringUtils.isNotBlank(sql)) {
                 for (String opType : opList) {
-                    if (sql.toLowerCase().contains(opType)){
+                    if (sql.toLowerCase().contains(opType)) {
                         jdbcTemplate.execute(sql);
+                        count++;
                     }
-                    log.info("*** dynamic ds *** can't execute this type of sql type:{},sql:{}",opType,sql);
+                    log.info("*** dynamic ds *** can't execute this type {} of sql {}", opType, sql);
                 }
             }
         }
-        log.info("*** dynamic ds *** execute sql file complete");
+        log.info("*** dynamic ds *** execute sql file complete\n*** dynamic ds *** total:{},execute:{}", total, count);
     }
 
     private static String getDatabase(String url) {
@@ -156,11 +159,11 @@ public class DatabaseUtils {
         return m.group();
     }
 
-    public static void validateDsProperty(DsProperty property){
+    public static void validateDsProperty(DsProperty property) {
         String url = property.getUrl();
         String database = property.getDatabase();
-        if (StringUtils.isNotBlank(url) && StringUtils.isNotBlank(database)){
-            if (!database.equals(getDatabase(url))){
+        if (StringUtils.isNotBlank(url) && StringUtils.isNotBlank(database)) {
+            if (!database.equals(getDatabase(url))) {
                 throw new RuntimeException("*** dynamic ds *** contains database info are not consistency");
             }
         }
