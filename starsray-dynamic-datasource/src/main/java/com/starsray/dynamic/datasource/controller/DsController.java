@@ -31,4 +31,9 @@ public class DsController {
         }
         return R.success(strings);
     }
+
+    @PostMapping("update")
+    public R<Boolean> update(@RequestParam("name") String name) {
+        return R.success(ds.executeSql(name, null));
+    }
 }

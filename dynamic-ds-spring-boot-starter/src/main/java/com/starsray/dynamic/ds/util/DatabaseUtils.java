@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.sql.DriverManager;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -76,9 +77,10 @@ public class DatabaseUtils {
      *
      * @param jdbcTemplate jdbc模板
      * @param sqlFileUrl   sql文件url
+     * @param opList       操作列表
      */
-    public synchronized static void executeSql(JdbcTemplate jdbcTemplate, String sqlFileUrl) {
-        execute(sqlFileUrl, jdbcTemplate);
+    public synchronized static void executeSql(JdbcTemplate jdbcTemplate, String sqlFileUrl,List<String> opList) {
+        execute(sqlFileUrl, jdbcTemplate, opList);
     }
 
     /**
@@ -88,14 +90,12 @@ public class DatabaseUtils {
      */
     public synchronized static void executeSql(DsProperty property) {
         String sqlFileUrl = property.getSqlFileUrl();
+        List<String> opList = property.getOpList();
         JdbcTemplate jdbcTemplate = createJdbcTemplate(property);
-        execute(sqlFileUrl, jdbcTemplate);
+        execute(sqlFileUrl, jdbcTemplate, opList);
     }
 
-    private static void execute(String sqlFileUrl, JdbcTemplate jdbcTemplate) {
-        if (StringUtils.isBlank(sqlFileUrl)) {
-            throw new RuntimeException("*** dynamic ds *** sqlFileUrl is empty");
-        }
+    private static void execute(String sqlFileUrl, JdbcTemplate jdbcTemplate, List<String> opList) {
         String sqlText = null;
         if (sqlFileUrl.contains("http")) {
             try {
@@ -116,7 +116,12 @@ public class DatabaseUtils {
         String[] sqlStrings = sqlText.split(";");
         for (String sql : sqlStrings) {
             if (StringUtils.isNotBlank(sql)) {
-                jdbcTemplate.execute(sql);
+                for (String opType : opList) {
+                    if (sql.toLowerCase().contains(opType)){
+                        jdbcTemplate.execute(sql);
+                    }
+                    log.info("*** dynamic ds *** can't execute this type of sql type:{},sql:{}",opType,sql);
+                }
             }
         }
         log.info("*** dynamic ds *** execute sql file complete");

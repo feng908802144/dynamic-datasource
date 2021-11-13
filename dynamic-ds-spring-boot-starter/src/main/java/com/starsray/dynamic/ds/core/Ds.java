@@ -12,45 +12,110 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
 import javax.sql.DataSource;
 import java.io.IOException;
 import java.io.Serializable;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 /**
  * Ds Operator
  *
  * @author starsray
- * @since 2021-11-10
+ * @since 2021-11-13
  */
 @Service
 public interface Ds {
 
+    /**
+     * 列表数据源
+     *
+     * @return {@link Set<String> }
+     */
     Set<String> listDatasource();
 
+    /**
+     * 添加数据源
+     *
+     * @param property 所有物
+     * @return {@link Set<String> }
+     */
     Set<String> addDatasource(DsProperty property) throws IOException;
 
+    /**
+     * 删除数据源
+     *
+     * @param name 名称
+     * @param drop 滴
+     * @return boolean
+     */
     boolean removeDatasource(String name, boolean drop);
 
-    boolean executeSqlText(String name, String sqlFilePath);
+    /**
+     * 执行sql文本 执行指定数据源、指定位置处sql
+     *
+     * @param name       名称
+     * @param sqlFileUrl sql文件url
+     * @return boolean
+     */
+    boolean executeSql(String name, String sqlFileUrl);
 
-    boolean executeSqlText(String sqlFilePath);
+    /**
+     * 通过sql文件url执行sql 对所有数据源执行指定位置sql文件
+     *
+     * @param sqlFileUrl sql文件url
+     * @return boolean
+     */
+    boolean executeSqlBySqlFileUrl(String sqlFileUrl);
 
+    /**
+     * 按名称执行sql文本 根据数据源名称执行默认配置文件路径
+     *
+     * @param name 名称
+     * @return boolean
+     */
+    boolean executeSqlByName(String name);
+
+    /**
+     * 执行sql文本 对所有数据源执行默认配置文件路径
+     *
+     * @return boolean
+     */
+    boolean executeSql();
+
+    /**
+     * ds服务
+     *
+     * @author starsray
+     * @since 2021-11-13
+     */
     @Service
     class DsService implements Ds {
 
+        /**
+         * 列表数据源
+         *
+         * @return {@link Set<String> }
+         */
+        @Override
         public Set<String> listDatasource() {
             DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
             return ds.getDataSources().keySet();
         }
 
+        /**
+         * 添加数据源
+         *
+         * @param property 所有物
+         * @return {@link Set<String> }
+         */
+        @Override
         @Transactional(rollbackFor = Exception.class)
         public Set<String> addDatasource(DsProperty property) {
             DatabaseUtils.validateDsProperty(property);
@@ -59,9 +124,12 @@ public interface Ds {
             if (ds.getDataSources().containsKey(db.getName())) {
                 return ds.getDataSources().keySet();
             }
+            // 如果正常连接在新数据源执行，如果连接不通畅 在当前数据源执行SQL
+            List<String> opList = Arrays.asList("create", "alter");
             if (DatabaseUtils.validateConn(property)) {
                 DatabaseUtils.createDatabase(property);
                 List<String> sqlFileUrlList = defaultDsSqlFileConfig.getSqlFileList();
+                property.setOpList(opList);
                 sqlFileUrlList.forEach(sqlFileUrl -> {
                     property.setSqlFileUrl(sqlFileUrl);
                     DatabaseUtils.executeSql(property);
@@ -69,7 +137,7 @@ public interface Ds {
             } else {
                 DatabaseUtils.createDatabse(jdbcTemplate, property.getDatabase());
                 List<String> sqlFileUrlList = defaultDsSqlFileConfig.getSqlFileList();
-                sqlFileUrlList.forEach(sqlFileUrl -> DatabaseUtils.executeSql(jdbcTemplate, sqlFileUrl));
+                sqlFileUrlList.forEach(sqlFileUrl -> DatabaseUtils.executeSql(jdbcTemplate, sqlFileUrl, opList));
             }
             db.save();
             DataSourceProperty dataSourceProperty = new DataSourceProperty();
@@ -84,6 +152,15 @@ public interface Ds {
         }
 
 
+        /**
+         * 删除数据源
+         *
+         * @param name 名称
+         * @param drop 滴
+         * @return boolean
+         */
+        @Override
+        @Transactional(rollbackFor = Exception.class)
         public boolean removeDatasource(String name, boolean drop) {
             if (name.equals("master")) {
                 throw new RuntimeException("datasource master can't remove!");
@@ -98,25 +175,115 @@ public interface Ds {
             return true;
         }
 
-        public boolean executeSqlText(String name, String sqlFilePath) {
+        /**
+         * 执行sql
+         *
+         * @param name       名称
+         * @param sqlFileUrl sql文件url
+         * @return boolean
+         */
+        @Override
+        @Transactional(rollbackFor = Exception.class)
+        public boolean executeSql(String name, String sqlFileUrl) {
+            if (StringUtils.isBlank(name) || StringUtils.isBlank(sqlFileUrl)) {
+                throw new RuntimeException("*** dynamic ds *** datasource name or sqlFileUrl can't empty");
+            }
             DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
             Map<String, DataSource> currentDataSources = ds.getDataSources();
-            execute(sqlFilePath, currentDataSources, name);
+            List<String> opList = Arrays.asList("create", "update", "alter", "delete");
+            execute(sqlFileUrl, currentDataSources, name, opList);
             return true;
         }
 
-        public boolean executeSqlText(String sqlFilePath) {
+        /**
+         * 通过sql文件url执行sql
+         *
+         * @param sqlFileUrl sql文件url
+         * @return boolean
+         */
+        @Override
+        @Transactional(rollbackFor = Exception.class)
+        public boolean executeSqlBySqlFileUrl(String sqlFileUrl) {
+            if (StringUtils.isBlank(sqlFileUrl)) {
+                throw new RuntimeException("*** dynamic ds *** sqlFileUrl can't empty");
+            }
             DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
             Map<String, DataSource> currentDataSources = ds.getDataSources();
+            List<String> opList = Arrays.asList("create", "alter", "update");
             for (String name : currentDataSources.keySet()) {
-                execute(sqlFilePath, currentDataSources, name);
+                execute(sqlFileUrl, currentDataSources, name, opList);
             }
             return true;
         }
 
-        private void execute(String sqlFilePath, Map<String, DataSource> currentDataSources, String name) {
+        /**
+         * 按名称执行sql
+         *
+         * @param name 名称
+         * @return boolean
+         */
+        @Override
+        @Transactional(rollbackFor = Exception.class)
+        public boolean executeSqlByName(String name) {
+            if (StringUtils.isBlank(name)) {
+                throw new RuntimeException("*** dynamic ds *** datasource name can't empty");
+            }
+            List<String> sqlFileList = defaultDsSqlFileConfig.getSqlFileList();
+            if (CollectionUtils.isEmpty(sqlFileList)) {
+                throw new RuntimeException("*** dynamic ds *** can't find any sql files");
+            }
+            List<String> opList = Arrays.asList("create", "alter", "update");
+            DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
+            Map<String, DataSource> currentDataSources = ds.getDataSources();
+            DsProperty dsProperty = getDsProperty(name, currentDataSources);
+            dsProperty.setOpList(opList);
+            for (String sqlFileUrl : sqlFileList) {
+                dsProperty.setSqlFileUrl(sqlFileUrl);
+                DatabaseUtils.executeSql(dsProperty);
+            }
+            return true;
+        }
+
+        /**
+         * 执行sql
+         *
+         * @return boolean
+         */
+        @Override
+        @Transactional(rollbackFor = Exception.class)
+        public boolean executeSql() {
+            List<String> opList = Collections.singletonList("create");
+            List<String> sqlFileList = defaultDsSqlFileConfig.getSqlFileList();
+            if (CollectionUtils.isEmpty(sqlFileList)) {
+                throw new RuntimeException("*** dynamic ds *** can't find any sql files");
+            }
+            DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
+            Map<String, DataSource> currentDataSources = ds.getDataSources();
+            for (String name : currentDataSources.keySet()) {
+                DsProperty dsProperty = getDsProperty(name, currentDataSources);
+                dsProperty.setOpList(opList);
+                for (String sqlFileUrl : sqlFileList) {
+                    dsProperty.setSqlFileUrl(sqlFileUrl);
+                    DatabaseUtils.executeSql(dsProperty);
+                }
+            }
+            return true;
+        }
+
+        /**
+         * 获取ds属性
+         *
+         * @param name               名称
+         * @param currentDataSources 当前数据源
+         * @return {@link DsProperty }
+         */
+        @Transactional(rollbackFor = Exception.class)
+        public DsProperty getDsProperty(String name, Map<String, DataSource> currentDataSources) {
             DruidDataSource druidDataSource = null;
             DataSource source = currentDataSources.get(name);
+            if (source == null) {
+                throw new RuntimeException("*** dynamic ds *** can't find current datasource name" + name);
+            }
             if (source instanceof ItemDataSource) {
                 druidDataSource = (DruidDataSource) ((ItemDataSource) source).getRealDataSource();
             }
@@ -131,7 +298,21 @@ public interface Ds {
             dsProperty.setUrl(url);
             dsProperty.setUsername(username);
             dsProperty.setPassword(password);
+            return dsProperty;
+        }
+
+        /**
+         * 处决
+         *
+         * @param sqlFilePath        sql文件路径
+         * @param currentDataSources 当前数据源
+         * @param name               名称
+         */
+        @Transactional(rollbackFor = Exception.class)
+        public void execute(String sqlFilePath, Map<String, DataSource> currentDataSources, String name, List<String> opList) {
+            DsProperty dsProperty = getDsProperty(name, currentDataSources);
             dsProperty.setSqlFileUrl(sqlFilePath);
+            dsProperty.setOpList(opList);
             DatabaseUtils.executeSql(dsProperty);
         }
 

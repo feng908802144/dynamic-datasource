@@ -1,4 +1,4 @@
-//package com.starsray.dynamic.datasource.aop;
+//package com.starsray.dynamic.datasource.interceptor;
 //
 //import com.baomidou.dynamic.datasource.toolkit.DynamicDataSourceContextHolder;
 //import com.starsray.dynamic.datasource.annotation.DefaultDs;
@@ -18,6 +18,7 @@
 //import org.springframework.web.context.request.RequestAttributes;
 //import org.springframework.web.context.request.RequestContextHolder;
 //import org.springframework.web.context.request.ServletRequestAttributes;
+//import org.springframework.web.servlet.HandlerInterceptor;
 //
 //import javax.servlet.http.HttpServletRequest;
 //import java.lang.reflect.Method;
@@ -33,7 +34,7 @@
 //@Aspect
 //@Component
 //@RequiredArgsConstructor(onConstructor_ = @Autowired)
-//public class DsInterceptor {
+//public class DsInterceptor implements HandlerInterceptor {
 //
 //    @Pointcut("execution(public * com.starsray.dynamic.datasource.controller.*.*(..))")
 //    public void datasourcePointcut() {

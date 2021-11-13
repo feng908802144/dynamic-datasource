@@ -2,6 +2,8 @@ package com.starsray.dynamic.ds.core;
 
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class DsProperty {
     private String type;
@@ -11,4 +13,5 @@ public class DsProperty {
     private String username;
     private String password;
     private String sqlFileUrl;
+    private List<String> opList;
 }
