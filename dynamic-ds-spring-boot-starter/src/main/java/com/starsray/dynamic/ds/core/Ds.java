@@ -13,6 +13,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
+import org.springframework.beans.BeanUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -43,10 +44,10 @@ public interface Ds {
     /**
      * 添加数据源
      *
-     * @param property 所有物
+     * @param param 停止
      * @return {@link Set<String> }
      */
-    Set<String> addDatasource(DsProperty property) throws IOException;
+    Set<String> addDatasource(DsParam param) throws IOException;
 
     /**
      * 删除数据源
@@ -112,12 +113,14 @@ public interface Ds {
         /**
          * 添加数据源
          *
-         * @param property 所有物
+         * @param param param
          * @return {@link Set<String> }
          */
         @Override
         @Transactional(rollbackFor = Exception.class)
-        public Set<String> addDatasource(DsProperty property) {
+        public Set<String> addDatasource(DsParam param) {
+            DsProperty property = new DsProperty();
+            BeanUtils.copyProperties(param,property);
             DatabaseUtils.validateDsProperty(property);
             DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
             DatasourceInstance db = DatasourceInstance.builder().jdbcTemplate(jdbcTemplate).build().of(property);

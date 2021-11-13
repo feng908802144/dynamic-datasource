@@ -2,6 +2,7 @@ package com.starsray.dynamic.datasource.controller;
 
 import com.starsray.dynamic.datasource.bean.R;
 import com.starsray.dynamic.ds.core.Ds;
+import com.starsray.dynamic.ds.core.DsParam;
 import com.starsray.dynamic.ds.core.DsProperty;
 import org.springframework.web.bind.annotation.*;
 
@@ -22,7 +23,7 @@ public class DsController {
     }
 
     @PostMapping("add")
-    public R<Set<String>> add(@RequestBody DsProperty dsp) {
+    public R<Set<String>> add(@RequestBody DsParam dsp) {
         Set<String> strings = null;
         try {
             strings = ds.addDatasource(dsp);

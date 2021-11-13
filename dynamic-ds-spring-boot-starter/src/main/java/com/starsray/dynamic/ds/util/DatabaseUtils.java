@@ -114,20 +114,23 @@ public class DatabaseUtils {
         }
         assert sqlText != null;
         String[] sqlStrings = sqlText.split(";");
-        int count = 0;
+        int execute = 0;
+        int notExec = 0;
         int total = sqlStrings.length;
         for (String sql : sqlStrings) {
             if (StringUtils.isNotBlank(sql)) {
                 for (String opType : opList) {
                     if (sql.toLowerCase().contains(opType)) {
                         jdbcTemplate.execute(sql);
-                        count++;
+                        execute++;
+                    } else {
+                        log.info("*** dynamic ds *** can't execute this type {} of \nsql {}", opType, sql);
+                        notExec++;
                     }
-                    log.info("*** dynamic ds *** can't execute this type {} of sql {}", opType, sql);
                 }
             }
         }
-        log.info("*** dynamic ds *** execute sql file complete\n*** dynamic ds *** total:{},execute:{}", total, count);
+        log.info("*** dynamic ds *** execute sql file complete total:{},execute:{},not execute:{}", total, execute, notExec);
     }
 
     private static String getDatabase(String url) {
