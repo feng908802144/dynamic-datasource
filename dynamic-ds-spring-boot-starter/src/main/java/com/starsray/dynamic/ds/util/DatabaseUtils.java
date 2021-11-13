@@ -79,17 +79,6 @@ public class DatabaseUtils {
     /**
      * 执行sql
      *
-     * @param jdbcTemplate jdbc模板
-     * @param sqlFileUrl   sql文件url
-     * @param opList       操作列表
-     */
-    public synchronized static void executeSql(JdbcTemplate jdbcTemplate, String sqlFileUrl, List<String> opList) {
-        execute(sqlFileUrl, jdbcTemplate, opList);
-    }
-
-    /**
-     * 执行sql
-     *
      * @param property 所有物
      */
     public synchronized static void executeSql(DsProperty property) {
@@ -153,6 +142,12 @@ public class DatabaseUtils {
         return m.group();
     }
 
+    public static String replaceDatabase(String url, String database) {
+        return url.contains("?") ?
+                url.replaceAll(("(?<=\\d/).*(?=\\?)"), database) :
+                url.replaceAll(("(?<=\\d/).*"), database);
+    }
+
     private static JdbcTemplate createJdbcTemplate(DsProperty property) {
         String url = property.getUrl();
         String username = property.getUsername();
@@ -171,5 +166,9 @@ public class DatabaseUtils {
             throw new RuntimeException("can't match host from url");
         }
         return m.group();
+    }
+
+    public static void main(String[] args) {
+        System.out.println(replaceDatabase("jdbc:mysql://127.0.0.1:3306/slave","cur"));
     }
 }

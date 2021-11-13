@@ -17,7 +17,13 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.DefaultTransactionDefinition;
+import org.springframework.transaction.support.TransactionCallback;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
@@ -139,57 +145,47 @@ public interface Ds {
          * @return {@link Set<String> }
          */
         @Override
-        @Transactional(rollbackFor = Exception.class)
         public Set<String> addDatasourceWithParams(Params params) {
             validateParams(params);
             DsProperty property = new DsProperty();
             BeanUtils.copyProperties(params, property);
+
             DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
             DatasourceInstance db = DatasourceInstance.builder().jdbcTemplate(jdbcTemplate).build().of(property);
-            if (ds.getDataSources().containsKey(db.getName())) {
-                return ds.getDataSources().keySet();
+            Map<String, DataSource> dataSources = ds.getDataSources();
+            if (dataSources.containsKey(db.getName())) {
+                return dataSources.keySet();
             }
-            List<String> opList = Arrays.asList("create", "alter");
-            if (DatabaseUtils.validateConn(property)) {
-                DatabaseUtils.createDatabase(property);
-                List<String> sqlFileUrlList = defaultDsSqlFileConfig.getSqlFileList();
-                property.setOpList(opList);
-                sqlFileUrlList.forEach(sqlFileUrl -> {
-                    property.setSqlFileUrl(sqlFileUrl);
-                    DatabaseUtils.executeSql(property);
-                });
-            }
-            db.save();
+
             DataSourceProperty dataSourceProperty = new DataSourceProperty();
             dataSourceProperty.setPoolName(db.getName());
             dataSourceProperty.setUrl(db.getUrl());
             dataSourceProperty.setUsername(db.getUsername());
             dataSourceProperty.setPassword(db.getPassword());
             dataSourceProperty.setDriverClassName(db.getDriver());
+
+            List<String> opList = Arrays.asList("create", "alter");
+            if (DatabaseUtils.validateConn(property)) {
+                DatabaseUtils.createDatabase(property);
+                List<String> sqlFileUrlList = defaultDsSqlFileConfig.getSqlFileList();
+                property.setOpList(opList);
+                transactionTemplate.execute(status -> {
+                    try {
+                        for (String sqlFileUrl : sqlFileUrlList) {
+                            property.setSqlFileUrl(sqlFileUrl);
+                            DatabaseUtils.executeSql(property);
+                        }
+                    } catch (Exception e) {
+                        status.isRollbackOnly();
+                        e.printStackTrace();
+                    }
+                    return dataSources.keySet();
+                });
+            }
+            db.save();
             DataSource dataSource = druidDataSourceCreator.createDataSource(dataSourceProperty);
             ds.addDataSource(db.getName(), dataSource);
-            return ds.getDataSources().keySet();
-        }
-
-        private void validateParams(Params params) {
-            if (StringUtils.isBlank(params.getName())) {
-                throw new RuntimeException("*** dynamic ds *** method add datasource with params params name can't empty");
-            }
-            if (StringUtils.isBlank(params.getPassword())) {
-                throw new RuntimeException("*** dynamic ds *** method add datasource with params params password can't empty");
-            }
-            if (StringUtils.isBlank(params.getType())) {
-                throw new RuntimeException("*** dynamic ds *** method add datasource with params params type can't empty");
-            }
-            if (StringUtils.isBlank(params.getUrl())) {
-                throw new RuntimeException("*** dynamic ds *** method add datasource with params params url can't empty");
-            }
-            if (StringUtils.isBlank(params.getUsername())) {
-                throw new RuntimeException("*** dynamic ds *** method add datasource with params params username can't empty");
-            }
-            if (StringUtils.isBlank(params.getSqlFileUrl())) {
-                throw new RuntimeException("*** dynamic ds *** method add datasource with params params sql file url can't empty");
-            }
+            return dataSources.keySet();
         }
 
         @Override
@@ -210,9 +206,11 @@ public interface Ds {
                 throw new RuntimeException("*** dynamic ds *** method add datasource with only params username can't empty");
             }
             String driverClassName = DsDriverEnum.getDriverClassName(type);
+
             DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
-            if (ds.getDataSources().containsKey(name)) {
-                return ds.getDataSources().keySet();
+            Map<String, DataSource> dataSources = ds.getDataSources();
+            if (dataSources.containsKey(name)) {
+                return dataSources.keySet();
             }
             DataSourceProperty dataSourceProperty = new DataSourceProperty();
             dataSourceProperty.setPoolName(name);
@@ -220,6 +218,7 @@ public interface Ds {
             dataSourceProperty.setUsername(username);
             dataSourceProperty.setPassword(password);
             dataSourceProperty.setDriverClassName(driverClassName);
+
             DataSource dataSource = druidDataSourceCreator.createDataSource(dataSourceProperty);
             ds.addDataSource(name, dataSource);
 
@@ -231,12 +230,13 @@ public interface Ds {
             property.setPassword(password);
             property.setName(name);
             db.save();
-            return ds.getDataSources().keySet();
+            return dataSources.keySet();
         }
 
 
         @Override
         public Set<String> addDatasourceWithCurrent(String name, String database) {
+
             if (StringUtils.isBlank(name)) {
                 throw new RuntimeException("*** dynamic ds *** method add datasource with current params name can't empty");
             }
@@ -244,21 +244,34 @@ public interface Ds {
                 throw new RuntimeException("*** dynamic ds *** method add datasource with current params database can't empty");
             }
             DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
-            DsProperty dsProperty = getDsProperty(name, ds.getDataSources());
+            Map<String, DataSource> dataSources = ds.getDataSources();
+            if (dataSources.containsKey(name)) {
+                return dataSources.keySet();
+            }
+            DsProperty dsProperty = getDsProperty(defaultDsConfig.getPrimary(), dataSources);
             DataSourceProperty dataSourceProperty = new DataSourceProperty();
             dataSourceProperty.setPoolName(name);
-            dataSourceProperty.setUrl(dsProperty.getUrl());
+            dataSourceProperty.setUrl(DatabaseUtils.replaceDatabase(dsProperty.getUrl(), database));
             dataSourceProperty.setUsername(dsProperty.getUsername());
             dataSourceProperty.setPassword(dsProperty.getPassword());
             dataSourceProperty.setDriverClassName(DsDriverEnum.getDriverClassName(dsProperty.getType()));
+
+            transactionTemplate.execute(status -> {
+                try {
+                    executeSqlByName(name);
+                } catch (Exception e) {
+                    status.isRollbackOnly();
+                    e.printStackTrace();
+                }
+                return dataSources.keySet();
+            });
 
             DatasourceInstance db = DatasourceInstance.builder().jdbcTemplate(jdbcTemplate).build().of(dsProperty);
             DataSource dataSource = druidDataSourceCreator.createDataSource(dataSourceProperty);
             ds.addDataSource(name, dataSource);
             DatabaseUtils.createDatabase(jdbcTemplate, database);
-            executeSqlByName(name);
             db.save();
-            return ds.getDataSources().keySet();
+            return dataSources.keySet();
         }
 
         /**
@@ -268,7 +281,6 @@ public interface Ds {
          * @return boolean
          */
         @Override
-        @Transactional(rollbackFor = Exception.class)
         public boolean removeDatasource(String name) {
             if ("master".equals(name)) {
                 throw new RuntimeException("*** dynamic ds *** datasource master can't remove!");
@@ -277,8 +289,8 @@ public interface Ds {
             if (!ds.getDataSources().containsKey(name)) {
                 throw new RuntimeException("*** dynamic ds *** datasource " + name + " not exist!");
             }
-            DatasourceInstance datasourceInstance = DatasourceInstance.builder().jdbcTemplate(jdbcTemplate).name(name).build();
-            datasourceInstance.remove();
+            DatasourceInstance db = DatasourceInstance.builder().jdbcTemplate(jdbcTemplate).name(name).build();
+            db.remove();
             ds.removeDataSource(name);
             return true;
         }
@@ -291,15 +303,22 @@ public interface Ds {
          * @return boolean
          */
         @Override
-        @Transactional(rollbackFor = Exception.class)
         public boolean executeSql(String name, String sqlFileUrl) {
             if (StringUtils.isBlank(name) || StringUtils.isBlank(sqlFileUrl)) {
                 throw new RuntimeException("*** dynamic ds *** datasource name or sqlFileUrl can't empty");
             }
-            DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
-            Map<String, DataSource> currentDataSources = ds.getDataSources();
-            List<String> opList = Arrays.asList("create", "update", "alter", "delete");
-            execute(sqlFileUrl, currentDataSources, name, opList);
+            transactionTemplate.execute(status -> {
+                try {
+                    DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
+                    Map<String, DataSource> currentDataSources = ds.getDataSources();
+                    List<String> opList = Arrays.asList("create", "update", "alter", "delete");
+                    execute(sqlFileUrl, currentDataSources, name, opList);
+                } catch (Exception e) {
+                    status.isRollbackOnly();
+                    e.printStackTrace();
+                }
+                return true;
+            });
             return true;
         }
 
@@ -310,17 +329,24 @@ public interface Ds {
          * @return boolean
          */
         @Override
-        @Transactional(rollbackFor = Exception.class)
         public boolean executeSqlBySqlFileUrl(String sqlFileUrl) {
             if (StringUtils.isBlank(sqlFileUrl)) {
                 throw new RuntimeException("*** dynamic ds *** sqlFileUrl can't empty");
             }
-            DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
-            Map<String, DataSource> currentDataSources = ds.getDataSources();
-            List<String> opList = Arrays.asList("create", "alter", "update");
-            for (String name : currentDataSources.keySet()) {
-                execute(sqlFileUrl, currentDataSources, name, opList);
-            }
+            transactionTemplate.execute(status -> {
+                try {
+                    DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
+                    Map<String, DataSource> currentDataSources = ds.getDataSources();
+                    List<String> opList = Arrays.asList("create", "alter", "update");
+                    for (String name : currentDataSources.keySet()) {
+                        execute(sqlFileUrl, currentDataSources, name, opList);
+                    }
+                } catch (Exception e) {
+                    status.isRollbackOnly();
+                    e.printStackTrace();
+                }
+                return true;
+            });
             return true;
         }
 
@@ -331,7 +357,6 @@ public interface Ds {
          * @return boolean
          */
         @Override
-        @Transactional(rollbackFor = Exception.class)
         public boolean executeSqlByName(String name) {
             if (StringUtils.isBlank(name)) {
                 throw new RuntimeException("*** dynamic ds *** datasource name can't empty");
@@ -340,15 +365,23 @@ public interface Ds {
             if (CollectionUtils.isEmpty(sqlFileList)) {
                 throw new RuntimeException("*** dynamic ds *** can't find any sql files");
             }
-            List<String> opList = Arrays.asList("create", "alter", "update");
-            DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
-            Map<String, DataSource> currentDataSources = ds.getDataSources();
-            DsProperty dsProperty = getDsProperty(name, currentDataSources);
-            dsProperty.setOpList(opList);
-            for (String sqlFileUrl : sqlFileList) {
-                dsProperty.setSqlFileUrl(sqlFileUrl);
-                DatabaseUtils.executeSql(dsProperty);
-            }
+            transactionTemplate.execute(status -> {
+                try {
+                    List<String> opList = Arrays.asList("create", "alter", "update");
+                    DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
+                    Map<String, DataSource> currentDataSources = ds.getDataSources();
+                    DsProperty dsProperty = getDsProperty(name, currentDataSources);
+                    dsProperty.setOpList(opList);
+                    for (String sqlFileUrl : sqlFileList) {
+                        dsProperty.setSqlFileUrl(sqlFileUrl);
+                        DatabaseUtils.executeSql(dsProperty);
+                    }
+                } catch (Exception e) {
+                    status.isRollbackOnly();
+                    e.printStackTrace();
+                }
+                return true;
+            });
             return true;
         }
 
@@ -358,23 +391,30 @@ public interface Ds {
          * @return boolean
          */
         @Override
-        @Transactional(rollbackFor = Exception.class)
         public boolean executeSql() {
             List<String> opList = Collections.singletonList("create");
             List<String> sqlFileList = defaultDsSqlFileConfig.getSqlFileList();
             if (CollectionUtils.isEmpty(sqlFileList)) {
                 throw new RuntimeException("*** dynamic ds *** can't find any sql files");
             }
-            DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
-            Map<String, DataSource> currentDataSources = ds.getDataSources();
-            for (String name : currentDataSources.keySet()) {
-                DsProperty dsProperty = getDsProperty(name, currentDataSources);
-                dsProperty.setOpList(opList);
-                for (String sqlFileUrl : sqlFileList) {
-                    dsProperty.setSqlFileUrl(sqlFileUrl);
-                    DatabaseUtils.executeSql(dsProperty);
+            transactionTemplate.execute(status -> {
+                try {
+                    DynamicRoutingDataSource ds = (DynamicRoutingDataSource) dataSource;
+                    Map<String, DataSource> currentDataSources = ds.getDataSources();
+                    for (String name : currentDataSources.keySet()) {
+                        DsProperty dsProperty = getDsProperty(name, currentDataSources);
+                        dsProperty.setOpList(opList);
+                        for (String sqlFileUrl : sqlFileList) {
+                            dsProperty.setSqlFileUrl(sqlFileUrl);
+                            DatabaseUtils.executeSql(dsProperty);
+                        }
+                    }
+                } catch (Exception e) {
+                    status.isRollbackOnly();
+                    e.printStackTrace();
                 }
-            }
+                return true;
+            });
             return true;
         }
 
@@ -385,12 +425,11 @@ public interface Ds {
          * @param currentDataSources 当前数据源
          * @return {@link DsProperty }
          */
-        @Transactional(rollbackFor = Exception.class)
-        public DsProperty getDsProperty(String name, Map<String, DataSource> currentDataSources) {
+        private DsProperty getDsProperty(String name, Map<String, DataSource> currentDataSources) {
             DruidDataSource druidDataSource = null;
             DataSource source = currentDataSources.get(name);
             if (source == null) {
-                throw new RuntimeException("*** dynamic ds *** can't find current datasource name" + name);
+                throw new RuntimeException("*** dynamic ds *** can't find current datasource name " + name);
             }
             if (source instanceof ItemDataSource) {
                 druidDataSource = (DruidDataSource) ((ItemDataSource) source).getRealDataSource();
@@ -418,12 +457,32 @@ public interface Ds {
          * @param currentDataSources 当前数据源
          * @param name               名称
          */
-        @Transactional(rollbackFor = Exception.class)
-        public void execute(String sqlFilePath, Map<String, DataSource> currentDataSources, String name, List<String> opList) {
+        private void execute(String sqlFilePath, Map<String, DataSource> currentDataSources, String name, List<String> opList) {
             DsProperty dsProperty = getDsProperty(name, currentDataSources);
             dsProperty.setSqlFileUrl(sqlFilePath);
             dsProperty.setOpList(opList);
             DatabaseUtils.executeSql(dsProperty);
+        }
+
+        private void validateParams(Params params) {
+            if (StringUtils.isBlank(params.getName())) {
+                throw new RuntimeException("*** dynamic ds *** method add datasource with params params name can't empty");
+            }
+            if (StringUtils.isBlank(params.getPassword())) {
+                throw new RuntimeException("*** dynamic ds *** method add datasource with params params password can't empty");
+            }
+            if (StringUtils.isBlank(params.getType())) {
+                throw new RuntimeException("*** dynamic ds *** method add datasource with params params type can't empty");
+            }
+            if (StringUtils.isBlank(params.getUrl())) {
+                throw new RuntimeException("*** dynamic ds *** method add datasource with params params url can't empty");
+            }
+            if (StringUtils.isBlank(params.getUsername())) {
+                throw new RuntimeException("*** dynamic ds *** method add datasource with params params username can't empty");
+            }
+            if (StringUtils.isBlank(params.getSqlFileUrl())) {
+                throw new RuntimeException("*** dynamic ds *** method add datasource with params params sql file url can't empty");
+            }
         }
 
         @Resource
@@ -436,6 +495,8 @@ public interface Ds {
         private DefaultDsSqlFileConfig defaultDsSqlFileConfig;
         @Resource
         private DefaultDsConfig defaultDsConfig;
+        @Resource
+        private TransactionTemplate transactionTemplate;
     }
 
     @Data
