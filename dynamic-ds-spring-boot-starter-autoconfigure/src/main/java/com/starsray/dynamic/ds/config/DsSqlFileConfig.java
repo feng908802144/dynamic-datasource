@@ -6,10 +6,16 @@ import org.springframework.context.annotation.Configuration;
 
 import java.util.List;
 
+/**
+ * 加载sql文件配置
+ *
+ * @author starsray
+ * @date 2021/11/16
+ */
 @ConfigurationProperties(prefix = "dynamic-ds")
 @Configuration
 @Data
-public class DefaultDsSqlFileConfig {
+public class DsSqlFileConfig {
     /**
      * sql文件url列表
      */

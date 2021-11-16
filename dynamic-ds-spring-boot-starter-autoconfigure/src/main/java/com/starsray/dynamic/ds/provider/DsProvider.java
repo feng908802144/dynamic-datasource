@@ -3,7 +3,7 @@ package com.starsray.dynamic.ds.provider;
 import com.baomidou.dynamic.datasource.provider.AbstractJdbcDataSourceProvider;
 import com.baomidou.dynamic.datasource.provider.DynamicDataSourceProvider;
 import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.DataSourceProperty;
-import com.starsray.dynamic.ds.config.DefaultDsConfig;
+import com.starsray.dynamic.ds.config.DataBaseConfig;
 import com.starsray.dynamic.ds.constant.DsDriverEnum;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -16,15 +16,21 @@ import java.sql.Statement;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * ds提供者
+ *
+ * @author starsray
+ * @date 2021/11/16
+ */
 @Primary
 @Configuration
 public class DsProvider {
     @Resource
-    private DefaultDsConfig defaultDsConfig;
+    private DataBaseConfig dataBaseConfig;
 
     @Bean
     public DynamicDataSourceProvider jdbcDynamicDataSourceProvider() {
-        return new AbstractJdbcDataSourceProvider(defaultDsConfig.getDriverClassName(), defaultDsConfig.getUrl(), defaultDsConfig.getUsername(), defaultDsConfig.getPassword()) {
+        return new AbstractJdbcDataSourceProvider(dataBaseConfig.getDriverClassName(), dataBaseConfig.getUrl(), dataBaseConfig.getUsername(), dataBaseConfig.getPassword()) {
             @Override
             protected Map<String, DataSourceProperty> executeStmt(Statement statement) {
                 Map<String, DataSourceProperty> dataSourcePropertiesMap = null;
@@ -46,11 +52,11 @@ public class DsProvider {
                     if (dataSourcePropertiesMap.size() == 0) {
                         statement.execute(insertSql());
                         DataSourceProperty dataSourceProperty = new DataSourceProperty();
-                        dataSourceProperty.setDriverClassName(defaultDsConfig.getDriverClassName());
-                        dataSourceProperty.setUrl(defaultDsConfig.getUrl());
-                        dataSourceProperty.setUsername(defaultDsConfig.getUsername());
-                        dataSourceProperty.setPassword(defaultDsConfig.getPassword());
-                        dataSourcePropertiesMap.put(defaultDsConfig.getPrimary(), dataSourceProperty);
+                        dataSourceProperty.setDriverClassName(dataBaseConfig.getDriverClassName());
+                        dataSourceProperty.setUrl(dataBaseConfig.getUrl());
+                        dataSourceProperty.setUsername(dataBaseConfig.getUsername());
+                        dataSourceProperty.setPassword(dataBaseConfig.getPassword());
+                        dataSourcePropertiesMap.put(dataBaseConfig.getPrimary(), dataSourceProperty);
                     }
                 } catch (SQLException e) {
                     e.printStackTrace();
@@ -74,12 +80,12 @@ public class DsProvider {
     }
 
     public String insertSql() {
-        return "INSERT INTO DYNAMIC_DATASOURCE_INSTANCE (type, name, username, password, url, driver) VALUES (" + "'" + DsDriverEnum.getType(defaultDsConfig.getDriverClassName()) + "'," +
-                "'" + defaultDsConfig.getPrimary() + "'," +
-                "'" + defaultDsConfig.getUsername() + "'," +
-                "'" + defaultDsConfig.getPassword() + "'," +
-                "'" + defaultDsConfig.getUrl() + "'," +
-                "'" + defaultDsConfig.getDriverClassName() + "'" +
+        return "INSERT INTO DYNAMIC_DATASOURCE_INSTANCE (type, name, username, password, url, driver) VALUES (" + "'" + DsDriverEnum.getType(dataBaseConfig.getDriverClassName()) + "'," +
+                "'" + dataBaseConfig.getPrimary() + "'," +
+                "'" + dataBaseConfig.getUsername() + "'," +
+                "'" + dataBaseConfig.getPassword() + "'," +
+                "'" + dataBaseConfig.getUrl() + "'," +
+                "'" + dataBaseConfig.getDriverClassName() + "'" +
                 ")";
     }
 }

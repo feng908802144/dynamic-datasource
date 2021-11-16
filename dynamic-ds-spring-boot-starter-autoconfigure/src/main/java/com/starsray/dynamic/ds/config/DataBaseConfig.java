@@ -5,7 +5,7 @@ import org.springframework.context.annotation.Configuration;
 
 @ConfigurationProperties(prefix = "spring.datasource.dynamic.datasource.master")
 @Configuration
-public class DefaultDsConfig {
+public class DataBaseConfig {
 
     /**
      * mybatis plus默认数据源 primary

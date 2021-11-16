@@ -4,6 +4,12 @@ import lombok.Data;
 
 import java.io.Serializable;
 
+/**
+ * Params
+ *
+ * @author starsray
+ * @date 2021/11/16
+ */
 @Data
 public class Params implements Serializable {
     private String type;

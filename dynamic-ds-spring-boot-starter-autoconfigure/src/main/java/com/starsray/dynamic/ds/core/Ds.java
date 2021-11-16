@@ -5,8 +5,8 @@ import com.baomidou.dynamic.datasource.DynamicRoutingDataSource;
 import com.baomidou.dynamic.datasource.creator.DruidDataSourceCreator;
 import com.baomidou.dynamic.datasource.ds.ItemDataSource;
 import com.baomidou.dynamic.datasource.spring.boot.autoconfigure.DataSourceProperty;
-import com.starsray.dynamic.ds.config.DefaultDsConfig;
-import com.starsray.dynamic.ds.config.DefaultDsSqlFileConfig;
+import com.starsray.dynamic.ds.config.DataBaseConfig;
+import com.starsray.dynamic.ds.config.DsSqlFileConfig;
 import com.starsray.dynamic.ds.constant.DsDriverEnum;
 import com.starsray.dynamic.ds.util.DatabaseUtils;
 import lombok.AllArgsConstructor;
@@ -17,18 +17,11 @@ import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.TransactionDefinition;
-import org.springframework.transaction.TransactionStatus;
-import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.DefaultTransactionDefinition;
-import org.springframework.transaction.support.TransactionCallback;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.util.CollectionUtils;
 
 import javax.annotation.Resource;
 import javax.sql.DataSource;
-import java.io.IOException;
 import java.io.Serializable;
 import java.util.*;
 
@@ -38,7 +31,6 @@ import java.util.*;
  * @author starsray
  * @since 2021-11-13
  */
-@Service
 public interface Ds {
 
     /**
@@ -167,7 +159,7 @@ public interface Ds {
             List<String> opList = Arrays.asList("create", "alter");
             if (DatabaseUtils.validateConn(property)) {
                 DatabaseUtils.createDatabase(property);
-                List<String> sqlFileUrlList = defaultDsSqlFileConfig.getSqlFileList();
+                List<String> sqlFileUrlList = dsSqlFileConfig.getSqlFileList();
                 property.setOpList(opList);
                 transactionTemplate.execute(status -> {
                     try {
@@ -248,7 +240,7 @@ public interface Ds {
             if (dataSources.containsKey(name)) {
                 return dataSources.keySet();
             }
-            DsProperty dsProperty = getDsProperty(defaultDsConfig.getPrimary(), dataSources);
+            DsProperty dsProperty = getDsProperty(dataBaseConfig.getPrimary(), dataSources);
             dsProperty.setName(name);
 
             DataSourceProperty dataSourceProperty = new DataSourceProperty();
@@ -363,7 +355,7 @@ public interface Ds {
             if (StringUtils.isBlank(name)) {
                 throw new RuntimeException("*** dynamic ds *** datasource name can't empty");
             }
-            List<String> sqlFileList = defaultDsSqlFileConfig.getSqlFileList();
+            List<String> sqlFileList = dsSqlFileConfig.getSqlFileList();
             if (CollectionUtils.isEmpty(sqlFileList)) {
                 throw new RuntimeException("*** dynamic ds *** can't find any sql files");
             }
@@ -395,7 +387,7 @@ public interface Ds {
         @Override
         public boolean executeSql() {
             List<String> opList = Collections.singletonList("create");
-            List<String> sqlFileList = defaultDsSqlFileConfig.getSqlFileList();
+            List<String> sqlFileList = dsSqlFileConfig.getSqlFileList();
             if (CollectionUtils.isEmpty(sqlFileList)) {
                 throw new RuntimeException("*** dynamic ds *** can't find any sql files");
             }
@@ -494,9 +486,9 @@ public interface Ds {
         @Resource
         private JdbcTemplate jdbcTemplate;
         @Resource
-        private DefaultDsSqlFileConfig defaultDsSqlFileConfig;
+        private DsSqlFileConfig dsSqlFileConfig;
         @Resource
-        private DefaultDsConfig defaultDsConfig;
+        private DataBaseConfig dataBaseConfig;
         @Resource
         private TransactionTemplate transactionTemplate;
     }
