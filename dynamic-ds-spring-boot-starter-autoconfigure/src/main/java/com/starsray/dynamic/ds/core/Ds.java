@@ -116,7 +116,6 @@ public interface Ds {
      * @author starsray
      * @since 2021-11-13
      */
-    @Service
     class DsService implements Ds {
 
         /**

@@ -11,7 +11,7 @@ import java.util.Set;
 @RestController
 @RequestMapping("ds")
 public class DsController {
-    @Resource
+    //@Resource
     private Ds ds;
 
     @GetMapping("list")
