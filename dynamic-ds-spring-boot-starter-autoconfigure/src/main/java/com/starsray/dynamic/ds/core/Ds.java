@@ -245,10 +245,17 @@ public interface Ds {
 
             DataSourceProperty dataSourceProperty = new DataSourceProperty();
             dataSourceProperty.setPoolName(name);
-            dataSourceProperty.setUrl(DatabaseUtils.replaceDatabase(dsProperty.getUrl(), database));
+            String curUrl = DatabaseUtils.replaceDatabase(dsProperty.getUrl(), database);
+            dsProperty.setUrl(curUrl);
+            dataSourceProperty.setUrl(curUrl);
             dataSourceProperty.setUsername(dsProperty.getUsername());
             dataSourceProperty.setPassword(dsProperty.getPassword());
             dataSourceProperty.setDriverClassName(DsDriverEnum.getDriverClassName(dsProperty.getType()));
+
+            DatasourceInstance db = DatasourceInstance.builder().jdbcTemplate(jdbcTemplate).build().of(dsProperty);
+            DataSource dataSource = druidDataSourceCreator.createDataSource(dataSourceProperty);
+            ds.addDataSource(name, dataSource);
+            DatabaseUtils.createDatabase(jdbcTemplate, database);
 
             transactionTemplate.execute(status -> {
                 try {
@@ -259,11 +266,6 @@ public interface Ds {
                 }
                 return dataSources.keySet();
             });
-
-            DatasourceInstance db = DatasourceInstance.builder().jdbcTemplate(jdbcTemplate).build().of(dsProperty);
-            DataSource dataSource = druidDataSourceCreator.createDataSource(dataSourceProperty);
-            ds.addDataSource(name, dataSource);
-            DatabaseUtils.createDatabase(jdbcTemplate, database);
             db.save();
             return dataSources.keySet();
         }
@@ -310,6 +312,7 @@ public interface Ds {
                 } catch (Exception e) {
                     status.isRollbackOnly();
                     e.printStackTrace();
+                    return false;
                 }
                 return true;
             });
@@ -338,6 +341,7 @@ public interface Ds {
                 } catch (Exception e) {
                     status.isRollbackOnly();
                     e.printStackTrace();
+                    return false;
                 }
                 return true;
             });
@@ -373,6 +377,7 @@ public interface Ds {
                 } catch (Exception e) {
                     status.isRollbackOnly();
                     e.printStackTrace();
+                    return false;
                 }
                 return true;
             });
@@ -423,7 +428,7 @@ public interface Ds {
             DruidDataSource druidDataSource = null;
             DataSource source = currentDataSources.get(name);
             if (source == null) {
-                throw new RuntimeException("*** dynamic ds *** can't find current datasource name " + name);
+                throw new RuntimeException("*** dynamic ds *** can't find datasource name " + name);
             }
             if (source instanceof ItemDataSource) {
                 druidDataSource = (DruidDataSource) ((ItemDataSource) source).getRealDataSource();
