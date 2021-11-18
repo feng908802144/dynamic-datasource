@@ -12,7 +12,7 @@
     <groupId>com.starsray</groupId>
     <artifactId>dynamic-ds-spring-boot-starter-autoconfigure</artifactId>
     <version>1.0-SNAPSHOT</version>
-    <name>dynamic-ds-spring-boot-starter</name>
+    <name>dynamic-ds-spring-boot-starter-autoconfigure</name>
     <description>dynamic-ds-spring-boot-starter</description>
     <developers>
         <developer>
